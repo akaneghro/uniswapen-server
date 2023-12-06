@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "module": "CommonJS",
+        "moduleResolution": "node",
+        "allowJs": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": false,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "rootDirs": ["./src"],
+        "outDir": "./dist/src"
+    },
+    "ts-node": {
+        "esm": true
+    },
+    "include": [
+        "./src/**/*",
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "./scripts",
+        "./test",
+        "./test/**/*"
+    ]
+}
