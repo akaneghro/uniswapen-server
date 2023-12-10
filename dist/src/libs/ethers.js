@@ -35,13 +35,38 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.aproveToken = exports.getAddressBalance = exports.getContract = exports.getConnectedWallet = void 0;
+exports.aproveToken = exports.getAddressBalance = exports.getContract = exports.getConnectedWallet = exports.getWallet = exports.converToGwei = exports.convertToWei = void 0;
 var ethers_1 = require("ethers");
-var ERC20ABI_json_1 = __importDefault(require("../contracts/ERC20ABI.json"));
+/**
+ * @description convert an amount to wei
+ * @param amount The amount to convert
+ * @param decimals The decimals of the token
+ * @returns The amount in wei
+ */
+var convertToWei = function (amount, decimals) {
+    return parseInt(ethers_1.ethers.utils.parseUnits(amount.toString(), decimals).toString());
+};
+exports.convertToWei = convertToWei;
+/**
+ * @description convert an amount to gwei
+ * @param amount The amount to convert
+ * @returns The amount in gwei
+ */
+var converToGwei = function (amount) {
+    return parseInt(ethers_1.ethers.utils.parseUnits(amount.toString(), 9).toString());
+};
+exports.converToGwei = converToGwei;
+/**
+ * @description Get the wallet
+ * @returns The wallet
+ */
+var getWallet = function () {
+    var _a;
+    var wallet = new ethers_1.ethers.Wallet((_a = process.env.WALLET_SECRET) !== null && _a !== void 0 ? _a : "");
+    return wallet;
+};
+exports.getWallet = getWallet;
 /**
  * @description Get the connected wallet
  * @returns The connected wallet
@@ -52,6 +77,12 @@ var getConnectedWallet = function () {
     return connectedWallet;
 };
 exports.getConnectedWallet = getConnectedWallet;
+/**
+ * @description Get the contract from an address and an abi
+ * @param contractAddress The address of the contract
+ * @param contractABI The abi of the contract
+ * @returns The contract
+ */
 var getContract = function (contractAddress, contractABI) {
     var contract = new ethers_1.ethers.Contract(contractAddress, contractABI, global.provider);
     return contract;
@@ -64,13 +95,13 @@ exports.getContract = getContract;
  * @param tokenDecimals The decimals of the token
  * @returns The balance of the address
  */
-var getAddressBalance = function (ownerAddress, tokenAddress, tokenDecimals) { return __awaiter(void 0, void 0, void 0, function () {
+var getAddressBalance = function (ownerAddress, tokenAddress, tokenAbi, tokenDecimals) { return __awaiter(void 0, void 0, void 0, function () {
     var contract, balance, error_1;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 _a.trys.push([0, 2, , 3]);
-                contract = new ethers_1.ethers.Contract(tokenAddress, ERC20ABI_json_1.default, global.provider);
+                contract = (0, exports.getContract)(tokenAddress, tokenAbi);
                 return [4 /*yield*/, contract.balanceOf(ownerAddress)];
             case 1:
                 balance = ((_a.sent()) /
@@ -88,18 +119,19 @@ exports.getAddressBalance = getAddressBalance;
 /**
  * @description Aprove a token to be used by a contract
  * @param tokenAddress The address of the token
+ * @param tokenAbi The abi of the token
  */
-var aproveToken = function (tokenAddress) { return __awaiter(void 0, void 0, void 0, function () {
+var aproveToken = function (tokenAddress, tokenAbi, amount) { return __awaiter(void 0, void 0, void 0, function () {
     var tokenContract, error_2;
     var _a;
     return __generator(this, function (_b) {
         switch (_b.label) {
             case 0:
                 _b.trys.push([0, 2, , 3]);
-                tokenContract = (0, exports.getContract)(tokenAddress, ERC20ABI_json_1.default);
+                tokenContract = (0, exports.getContract)(tokenAddress, tokenAbi);
                 return [4 /*yield*/, tokenContract
                         .connect((0, exports.getConnectedWallet)())
-                        .approve((_a = process.env.POSITION_MANAGER_ADDRESS) !== null && _a !== void 0 ? _a : "", 1000000000)];
+                        .approve((_a = process.env.POSITION_MANAGER_ADDRESS) !== null && _a !== void 0 ? _a : "", amount)];
             case 1:
                 _b.sent();
                 return [3 /*break*/, 3];

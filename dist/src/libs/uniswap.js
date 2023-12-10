@@ -43,30 +43,25 @@ exports.getTwapPrice = exports.getPositionsFromOwner = exports.mint = void 0;
 var axios_1 = __importDefault(require("axios"));
 var jsbi_1 = __importDefault(require("jsbi"));
 var ethers_1 = require("./ethers");
+var polygon_1 = require("./polygon");
 var queries_1 = require("../libs/queries");
 var tokens_1 = require("../libs/tokens");
 var PositionManagerABI_json_1 = __importDefault(require("../contracts/PositionManagerABI.json"));
-var PoolABI_json_1 = __importDefault(require("../contracts/PoolABI.json"));
 var v3_sdk_1 = require("@uniswap/v3-sdk");
+var sdk_core_1 = require("@uniswap/sdk-core");
 var IUniswapV3Pool_json_1 = __importDefault(require("@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"));
-var INonfungiblePositionManager_json_1 = __importDefault(require("@uniswap/v3-periphery/artifacts/contracts/interfaces/INonfungiblePositionManager.sol/INonfungiblePositionManager.json"));
+var IERC20Metadata_json_1 = __importDefault(require("@uniswap/v3-periphery/artifacts/contracts/interfaces/IERC20Metadata.sol/IERC20Metadata.json"));
 /**
  * @description Create a pool instance with the current data
  * @returns The pool intance with its data
  */
 var getPoolState = function (tokenA, tokenB, poolFee) { return __awaiter(void 0, void 0, void 0, function () {
-    var currentPoolAddress, poolContract, _a, token0, token1, fee, tickSpacing, liquidity, slot0;
-    var _b;
-    return __generator(this, function (_c) {
-        switch (_c.label) {
+    var poolAddress, poolContract, _a, token0, token1, fee, tickSpacing, liquidity, slot0;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
             case 0:
-                currentPoolAddress = (0, v3_sdk_1.computePoolAddress)({
-                    factoryAddress: (_b = process.env.POOL_FACTORY_ADDRESS) !== null && _b !== void 0 ? _b : "",
-                    tokenA: tokenA,
-                    tokenB: tokenB,
-                    fee: poolFee,
-                });
-                poolContract = (0, ethers_1.getContract)(currentPoolAddress, IUniswapV3Pool_json_1.default.abi);
+                poolAddress = getPoolAddress(tokenA, tokenB, poolFee);
+                poolContract = (0, ethers_1.getContract)(poolAddress, IUniswapV3Pool_json_1.default.abi);
                 return [4 /*yield*/, Promise.all([
                         poolContract.token0(),
                         poolContract.token1(),
@@ -76,7 +71,7 @@ var getPoolState = function (tokenA, tokenB, poolFee) { return __awaiter(void 0,
                         poolContract.slot0(),
                     ])];
             case 1:
-                _a = _c.sent(), token0 = _a[0], token1 = _a[1], fee = _a[2], tickSpacing = _a[3], liquidity = _a[4], slot0 = _a[5];
+                _a = _b.sent(), token0 = _a[0], token1 = _a[1], fee = _a[2], tickSpacing = _a[3], liquidity = _a[4], slot0 = _a[5];
                 return [2 /*return*/, {
                         token0: token0,
                         token1: token1,
@@ -90,68 +85,106 @@ var getPoolState = function (tokenA, tokenB, poolFee) { return __awaiter(void 0,
     });
 }); };
 /**
- * @description Mint a lew liquidity position.
+ * @description Mint a new liquidity position.
+ * @param token0Code The code of the first token
  * @param amount0 The amount of token0 to mint
+ * @param token1Code The code of the second token
  * @param amount1 The amount of token1 to mint
  */
-var mint = function (amount0, amount1) { return __awaiter(void 0, void 0, void 0, function () {
-    var poolState, configuredPool, position, params, nonfungiblePositionManagerContract;
-    var _a;
-    return __generator(this, function (_b) {
-        switch (_b.label) {
-            case 0: return [4 /*yield*/, (0, ethers_1.aproveToken)(tokens_1.WETH_TOKEN.address)];
+var mint = function (token0Code, amount0, token1Code, amount1) { return __awaiter(void 0, void 0, void 0, function () {
+    var tokenData0, tokenData1, poolState, configuredPool, position, mintOptions, _a, calldata, value, gasPrice, nonce, transaction, estimatedGas, signer;
+    var _b;
+    return __generator(this, function (_c) {
+        switch (_c.label) {
+            case 0:
+                tokenData0 = (0, tokens_1.getTokenData)(token0Code);
+                tokenData1 = (0, tokens_1.getTokenData)(token1Code);
+                return [4 /*yield*/, (0, ethers_1.aproveToken)(tokenData0.token.address, IERC20Metadata_json_1.default.abi, (0, ethers_1.convertToWei)(amount0.toString(), tokenData0.token.decimals))];
             case 1:
-                _b.sent();
-                return [4 /*yield*/, (0, ethers_1.aproveToken)(tokens_1.USDC_TOKEN.address)];
+                _c.sent();
+                return [4 /*yield*/, (0, ethers_1.aproveToken)(tokenData1.token.address, IERC20Metadata_json_1.default.abi, (0, ethers_1.convertToWei)(amount1.toString(), tokenData1.token.decimals))];
             case 2:
-                _b.sent();
-                return [4 /*yield*/, getPoolState(tokens_1.WETH_TOKEN, tokens_1.USDC_TOKEN, v3_sdk_1.FeeAmount.LOW)];
+                _c.sent();
+                return [4 /*yield*/, getPoolState(tokenData0.token, tokenData1.token, v3_sdk_1.FeeAmount.LOW)];
             case 3:
-                poolState = _b.sent();
-                configuredPool = new v3_sdk_1.Pool(tokens_1.WETH_TOKEN, tokens_1.USDC_TOKEN, poolState.fee, poolState.sqrtPriceX96.toString(), poolState.liquidity.toString(), poolState.tick);
+                poolState = _c.sent();
+                configuredPool = new v3_sdk_1.Pool(tokenData0.token, tokenData1.token, poolState.fee, poolState.sqrtPriceX96.toString(), poolState.liquidity.toString(), poolState.tick);
                 position = v3_sdk_1.Position.fromAmounts({
                     pool: configuredPool,
                     tickLower: (0, v3_sdk_1.nearestUsableTick)(poolState.tick, poolState.tickSpacing) -
-                        poolState.tickSpacing * 50,
+                        poolState.tickSpacing * 500,
                     tickUpper: (0, v3_sdk_1.nearestUsableTick)(poolState.tick, poolState.tickSpacing) +
-                        poolState.tickSpacing * 50,
-                    amount0: amount0,
-                    amount1: amount1,
+                        poolState.tickSpacing * 500,
+                    amount0: (0, ethers_1.convertToWei)(amount0.toString(), tokenData0.token.decimals),
+                    amount1: (0, ethers_1.convertToWei)(amount1.toString(), tokenData1.token.decimals),
                     useFullPrecision: true,
                 });
-                params = {
-                    token0: tokens_1.WETH_TOKEN.address,
-                    token1: tokens_1.USDC_TOKEN.address,
-                    fee: poolState.fee,
-                    tickLower: position.tickLower.toString(),
-                    tickUpper: position.tickUpper.toString(),
-                    amount0Desired: position.amount0.toString(),
-                    amount1Desired: position.amount1.toString(),
-                    amount0Min: position.amount0.toString(),
-                    amount1Min: position.amount1.toString(),
-                    recipient: process.env.WALLET,
-                    deadline: Math.floor(Date.now() / 1000) + 60 * 10, //10 minutes
+                mintOptions = {
+                    recipient: global.owner,
+                    deadline: Math.floor(Date.now() / 1000) + 60 * 5,
+                    slippageTolerance: new sdk_core_1.Percent(50, 10000),
                 };
-                nonfungiblePositionManagerContract = (0, ethers_1.getContract)((_a = process.env.POSITION_MANAGER_ADDRESS) !== null && _a !== void 0 ? _a : "", INonfungiblePositionManager_json_1.default.abi);
+                _a = v3_sdk_1.NonfungiblePositionManager.addCallParameters(position, mintOptions), calldata = _a.calldata, value = _a.value;
+                return [4 /*yield*/, global.provider.getFeeData()];
+            case 4:
+                gasPrice = _c.sent();
+                console.log("gas price:", gasPrice.gasPrice.toString());
+                return [4 /*yield*/, global.provider.getTransactionCount(global.owner, "latest")];
+            case 5:
+                nonce = _c.sent();
+                console.log("nonce:", nonce);
+                transaction = {
+                    data: calldata,
+                    to: (_b = process.env.POSITION_MANAGER_ADDRESS) !== null && _b !== void 0 ? _b : "",
+                    value: value,
+                    from: global.owner,
+                    gasPrice: gasPrice.gasPrice * 1.5,
+                };
+                return [4 /*yield*/, global.provider.estimateGas(transaction)];
+            case 6:
+                estimatedGas = _c.sent();
+                console.log("estimated gas:", estimatedGas.toString());
+                signer = (0, ethers_1.getConnectedWallet)();
                 return [2 /*return*/];
         }
     });
 }); };
 exports.mint = mint;
 /**
+ * @description Get the pool address from two tokens
+ * @param tokenA The first token
+ * @param tokenB The second token
+ * @param poolFee The fee of the pool
+ */
+var getPoolAddress = function (tokenA, tokenB, poolFee) {
+    var _a;
+    return (0, v3_sdk_1.computePoolAddress)({
+        factoryAddress: (_a = process.env.POOL_FACTORY_ADDRESS) !== null && _a !== void 0 ? _a : "",
+        tokenA: tokenA,
+        tokenB: tokenB,
+        fee: poolFee,
+    });
+};
+/**
  * @description Get the tokens id from an owner in a pool
  * @param ownerAddress The address of the owner
  */
-var getPositionsFromOwner = function (ownerAddress) { return __awaiter(void 0, void 0, void 0, function () {
-    var query, response, positions, pool_1, error_1;
+var getPositionsFromOwner = function (token0Code, token1Code, ownerAddress) { return __awaiter(void 0, void 0, void 0, function () {
+    var tokenData0, tokenData1, poolAddress, poolAbi, query, response, positions, pool_1, error_1;
     var _a, _b;
     return __generator(this, function (_c) {
         switch (_c.label) {
             case 0:
-                _c.trys.push([0, 2, , 3]);
-                query = (0, queries_1.getTokensIdQuery)(ownerAddress, PoolABI_json_1.default.toString());
-                return [4 /*yield*/, axios_1.default.post((_a = process.env.POOL_SUBGRAPH) !== null && _a !== void 0 ? _a : "", JSON.stringify({ query: query }))];
+                _c.trys.push([0, 3, , 4]);
+                tokenData0 = (0, tokens_1.getTokenData)(token0Code);
+                tokenData1 = (0, tokens_1.getTokenData)(token1Code);
+                poolAddress = getPoolAddress(tokenData0.token, tokenData1.token, v3_sdk_1.FeeAmount.LOW);
+                return [4 /*yield*/, (0, polygon_1.getContractAbiPolygonScan)(poolAddress)];
             case 1:
+                poolAbi = _c.sent();
+                query = (0, queries_1.getTokensIdQuery)(ownerAddress, poolAbi.toString());
+                return [4 /*yield*/, axios_1.default.post((_a = process.env.POOL_SUBGRAPH) !== null && _a !== void 0 ? _a : "", JSON.stringify({ query: query }))];
+            case 2:
                 response = _c.sent();
                 positions = response.data.data.positions;
                 pool_1 = (0, ethers_1.getContract)((_b = process.env.POSITION_MANAGER_ADDRESS) !== null && _b !== void 0 ? _b : "", PositionManagerABI_json_1.default);
@@ -161,12 +194,12 @@ var getPositionsFromOwner = function (ownerAddress) { return __awaiter(void 0, v
                         .call()
                         .then(function (position) { return console.log(position); });
                 });
-                return [3 /*break*/, 3];
-            case 2:
+                return [3 /*break*/, 4];
+            case 3:
                 error_1 = _c.sent();
                 console.log(error_1);
                 throw new Error("Error getting positions from owner");
-            case 3: return [2 /*return*/];
+            case 4: return [2 /*return*/];
         }
     });
 }); };
@@ -175,17 +208,22 @@ exports.getPositionsFromOwner = getPositionsFromOwner;
  * @description The the Time Weight Average Price for tokens in a pool
  * @param seconds The last x seonds to calculate the TWAP
  */
-var getTwapPrice = function (seconds) { return __awaiter(void 0, void 0, void 0, function () {
-    var pool, observeData, tickCumulatives, tickCumulativesDelta, arithmeticMeanTick, arithmeticMeanTickInt, sqrtRatioX96, error_2;
-    var _a;
-    return __generator(this, function (_b) {
-        switch (_b.label) {
+var getTwapPrice = function (token0Code, token1Code, seconds) { return __awaiter(void 0, void 0, void 0, function () {
+    var tokenData0, tokenData1, poolAddress, poolAbi, pool, observeData, tickCumulatives, tickCumulativesDelta, arithmeticMeanTick, arithmeticMeanTickInt, sqrtRatioX96, error_2;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
             case 0:
-                _b.trys.push([0, 2, , 3]);
-                pool = (0, ethers_1.getContract)((_a = process.env.POOL_ADDRESS) !== null && _a !== void 0 ? _a : "", PoolABI_json_1.default);
-                return [4 /*yield*/, pool.observe([seconds, 0])];
+                _a.trys.push([0, 3, , 4]);
+                tokenData0 = (0, tokens_1.getTokenData)(token0Code);
+                tokenData1 = (0, tokens_1.getTokenData)(token1Code);
+                poolAddress = getPoolAddress(tokenData0.token, tokenData1.token, v3_sdk_1.FeeAmount.LOW);
+                return [4 /*yield*/, (0, polygon_1.getContractAbiPolygonScan)(poolAddress)];
             case 1:
-                observeData = _b.sent();
+                poolAbi = _a.sent();
+                pool = (0, ethers_1.getContract)(poolAddress, poolAbi);
+                return [4 /*yield*/, pool.observe([seconds, 0])];
+            case 2:
+                observeData = _a.sent();
                 tickCumulatives = observeData.tickCumulatives.map(function (t) {
                     return Number(t);
                 });
@@ -193,17 +231,34 @@ var getTwapPrice = function (seconds) { return __awaiter(void 0, void 0, void 0,
                 arithmeticMeanTick = (tickCumulativesDelta / seconds).toFixed(0);
                 arithmeticMeanTickInt = parseInt(arithmeticMeanTick);
                 sqrtRatioX96 = v3_sdk_1.TickMath.getSqrtRatioAtTick(arithmeticMeanTickInt);
-                return [2 /*return*/, getPriceFromSqrtRatio(sqrtRatioX96, tokens_1.WETH_TOKEN, tokens_1.USDC_TOKEN)];
-            case 2:
-                error_2 = _b.sent();
+                return [2 /*return*/, getPriceFromSqrtRatio(tokenData0.token, tokenData1.token, sqrtRatioX96)];
+            case 3:
+                error_2 = _a.sent();
                 console.log(error_2);
                 throw new Error("Error getting TWAP price");
-            case 3: return [2 /*return*/];
+            case 4: return [2 /*return*/];
         }
     });
 }); };
 exports.getTwapPrice = getTwapPrice;
-var getPriceFromSqrtRatio = function (sqrtRatioX96, baseToken, quoteToken) {
+/**
+ * @description Get the price from a tick
+ * @param tick The tick to get the price from
+ * @param baseToken The base token
+ * @param quoteToken The quote token
+ */
+var getPriceFromTick = function (baseToken, quoteToken, tick) {
+    var sqrtRatioX96 = v3_sdk_1.TickMath.getSqrtRatioAtTick(tick);
+    return getPriceFromSqrtRatio(baseToken, quoteToken, sqrtRatioX96);
+};
+/**
+ * @description Get the price from a sqrt ratio
+ * @param sqrtRatioX96 The sqrt ratio
+ * @param baseToken The base token
+ * @param quoteToken The quote token
+ * @returns The price
+ */
+var getPriceFromSqrtRatio = function (baseToken, quoteToken, sqrtRatioX96) {
     var ratioX96 = jsbi_1.default.multiply(sqrtRatioX96, sqrtRatioX96);
     var baseAmount = jsbi_1.default.BigInt(Math.pow(10, baseToken.decimals));
     var shiftedAmount = jsbi_1.default.leftShift(jsbi_1.default.BigInt(1), jsbi_1.default.BigInt(192));

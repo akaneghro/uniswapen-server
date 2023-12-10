@@ -10,6 +10,8 @@ global.isProduction = process.env.NODE_ENV === "production";
 
 global.provider = ProviderInstance.getInstance();
 
+global.owner = process.env.WALLET ?? "";
+
 const app = express();
 
 app.disable("x-powered-by");

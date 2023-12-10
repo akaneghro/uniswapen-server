@@ -47,7 +47,7 @@ var getMaticGasPrice = function () { return __awaiter(void 0, void 0, void 0, fu
     var _a;
     return __generator(this, function (_b) {
         switch (_b.label) {
-            case 0: return [4 /*yield*/, axios_1.default.get((_a = process.env.MATIC_GAS_API) !== null && _a !== void 0 ? _a : "")];
+            case 0: return [4 /*yield*/, axios_1.default.get((_a = process.env.POLYGON_GAS_API) !== null && _a !== void 0 ? _a : "")];
             case 1:
                 response = _b.sent();
                 estimatedBaseFee = parseInt((response.data.estimatedBaseFee * Math.pow(10, 9)).toString());

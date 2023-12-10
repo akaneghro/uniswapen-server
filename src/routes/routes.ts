@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getTwapPrice, mint } from "../libs/uniswap";
+import { mint, getTwapPrice } from "../libs/uniswap";
 import { getEthUsdPrice } from "../libs/link";
 
 export const routes = Router();
@@ -15,15 +15,20 @@ routes.get("/ethPrice", async (req, res) => {
 });
 
 routes.get("/twapPrice", async (req, res) => {
-    const twap: string = await getTwapPrice(1000);
+    const twap: string = await getTwapPrice("WETH", "USDC", 1000);
 
     res.send(twap);
 });
 
 routes.post("/createPosition", async (req, res) => {
-    console.log(req.body);
+    const positionReq = req.body.position;
 
-    await mint(req.body.amount0, req.body.amount1);
+    const tx = await mint(
+        positionReq.token0,
+        positionReq.amount0,
+        positionReq.token1,
+        positionReq.amount1
+    );
 
     res.send("ok");
 });

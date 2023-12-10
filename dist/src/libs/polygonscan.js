@@ -35,53 +35,50 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.routes = void 0;
-var express_1 = require("express");
-var uniswap_1 = require("../libs/uniswap");
-var link_1 = require("../libs/link");
-exports.routes = (0, express_1.Router)();
-exports.routes.get("/", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    return __generator(this, function (_a) {
-        res.send("Hello world");
-        return [2 /*return*/];
-    });
-}); });
-exports.routes.get("/ethPrice", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var price;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
-            case 0: return [4 /*yield*/, (0, link_1.getEthUsdPrice)()];
+exports.getContractAbiPolygon = exports.getMaticGasPrice = void 0;
+var axios_1 = __importDefault(require("axios"));
+var ethers_1 = __importDefault(require("ethers"));
+var getMaticGasPrice = function () { return __awaiter(void 0, void 0, void 0, function () {
+    var response, estimatedBaseFee, safeLowGasPrice, standardGasPrice, fastGasPrice;
+    var _a;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
+            case 0: return [4 /*yield*/, axios_1.default.get((_a = process.env.POLYGON_GAS_API) !== null && _a !== void 0 ? _a : "")];
             case 1:
-                price = _a.sent();
-                res.send(price);
-                return [2 /*return*/];
+                response = _b.sent();
+                estimatedBaseFee = parseInt((response.data.estimatedBaseFee * Math.pow(10, 9)).toString());
+                safeLowGasPrice = ethers_1.default.utils.parseUnits(response.data.safeLow.maxPriorityFee.toString(), 9);
+                standardGasPrice = ethers_1.default.utils.parseUnits(response.data.standard.maxPriorityFee.toString(), 9);
+                fastGasPrice = ethers_1.default.utils.parseUnits(response.data.fast.maxPriorityFee.toString(), 9);
+                return [2 /*return*/, "Base fee: ".concat(estimatedBaseFee.toString(), " - Low: ").concat(safeLowGasPrice.toString(), " - Standard: ").concat(standardGasPrice.toString(), " - Fast: ").concat(fastGasPrice.toString())];
         }
     });
-}); });
-exports.routes.get("/twapPrice", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var twap;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
-            case 0: return [4 /*yield*/, (0, uniswap_1.getTwapPrice)("WETH", "USDC", 1000)];
-            case 1:
-                twap = _a.sent();
-                res.send(twap);
-                return [2 /*return*/];
-        }
-    });
-}); });
-exports.routes.post("/createPosition", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var positionReq, tx;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
+}); };
+exports.getMaticGasPrice = getMaticGasPrice;
+var getContractAbiPolygon = function (contractAddress) { return __awaiter(void 0, void 0, void 0, function () {
+    var res, contract, error_1;
+    var _a;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
             case 0:
-                positionReq = req.body.position;
-                return [4 /*yield*/, (0, uniswap_1.mint)(positionReq.token0, positionReq.amount0, positionReq.token1, positionReq.amount1)];
+                _b.trys.push([0, 3, , 4]);
+                return [4 /*yield*/, axios_1.default.get("https://api.polygonscan.com/api?module=contract&action=getabi&address=".concat(contractAddress, "&apikey=").concat((_a = process.env.POLYGONSCAN_API_KEY) !== null && _a !== void 0 ? _a : ""))];
             case 1:
-                tx = _a.sent();
-                res.send("ok");
-                return [2 /*return*/];
+                res = _b.sent();
+                return [4 /*yield*/, res.data.json()];
+            case 2:
+                contract = _b.sent();
+                return [2 /*return*/, JSON.parse(contract.result)];
+            case 3:
+                error_1 = _b.sent();
+                console.log(error_1);
+                throw new Error("Error getting contract abi");
+            case 4: return [2 /*return*/];
         }
     });
-}); });
+}); };
+exports.getContractAbiPolygon = getContractAbiPolygon;
